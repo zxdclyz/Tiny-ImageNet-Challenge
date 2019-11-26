@@ -110,11 +110,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # set dataset
     train_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt')
+        '/notebook', '/notebook/train.txt')
     val_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/val.txt')
+        '/notebook', '/notebook/val.txt')
     test_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/test.txt')
+        '/notebook', '/notebook/test.txt')
 
     train_sampler = None
 
@@ -238,7 +238,7 @@ def validate(val_loader, model, criterion, args):
     return top1.avg
 
 
-prediction = {}
+prediction = []
 
 
 def test(test_loader, model, args):
@@ -250,8 +250,9 @@ def test(test_loader, model, args):
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
 
-        output = model(images)
-        prediction[i] = output
+            output = model(images)
+            print(output.size())
+            prediction += output.argmax(dim=1).tolist()
 
     df = pd.DataFrame(prediction)
     df.to_csv('./prediction.csv')
