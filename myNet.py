@@ -1,5 +1,4 @@
-# TODO:add tester and log as csv
-
+# search "path to" and fix it
 import argparse
 import os
 import random
@@ -110,11 +109,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # set dataset
     train_dataset = TinyImageNetDataset(
-        '/notebook', '/notebook/train.txt')
+        'path to TinyImageNet', 'path to TinyImageNet/train.txt')
     val_dataset = TinyImageNetDataset(
-        '/notebook', '/notebook/val.txt')
+        'path to TinyImageNet', 'path to TinyImageNet/val.txt')
     test_dataset = TinyImageNetDataset(
-        '/notebook', '/notebook/test.txt')
+        'path to TinyImageNet', 'path to TinyImageNet/test.txt')
 
     train_sampler = None
 
@@ -251,10 +250,14 @@ def test(test_loader, model, args):
                 images = images.cuda(args.gpu, non_blocking=True)
 
             output = model(images)
-            print(output.size())
             prediction += output.argmax(dim=1).tolist()
 
-    df = pd.DataFrame(prediction)
+    index = []
+    labels = open('path to test.txt').readlines()
+    for line in labels:
+        index.append(line.split('/')[1].strip())
+
+    df = pd.DataFrame(prediction, index=index)
     df.to_csv('./prediction.csv')
 
 
