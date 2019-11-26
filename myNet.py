@@ -1,5 +1,4 @@
-# TODO:add tester and log as csv
-
+# search "path to" and fix it
 import argparse
 import os
 import random
@@ -109,30 +108,12 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # set dataset
-    # transforms are not tested yet!!
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
     train_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt', transform=transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+        'path to TinyImageNet', 'path to TinyImageNet/train.txt')
     val_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/val.txt', transform=transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+        'path to TinyImageNet', 'path to TinyImageNet/val.txt')
     test_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/test.txt', transform=transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+        'path to TinyImageNet', 'path to TinyImageNet/test.txt')
 
     train_sampler = None
 
@@ -256,7 +237,7 @@ def validate(val_loader, model, criterion, args):
     return top1.avg
 
 
-prediction = {}
+prediction = []
 
 
 def test(test_loader, model, args):
@@ -268,10 +249,15 @@ def test(test_loader, model, args):
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
 
-        output = model(images)
-        prediction[i] = output
+            output = model(images)
+            prediction += output.argmax(dim=1).tolist()
 
-    df = pd.DataFrame(prediction)
+    index = []
+    labels = open('path to test.txt').readlines()
+    for line in labels:
+        index.append(line.split('/')[1].strip())
+
+    df = pd.DataFrame(prediction, index=index)
     df.to_csv('./prediction.csv')
 
 
