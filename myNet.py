@@ -1,4 +1,4 @@
-#TODO:add tester and log as csv
+# TODO:add tester and log as csv
 
 import argparse
 import os
@@ -8,6 +8,7 @@ import time
 import warnings
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
@@ -108,10 +109,30 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # set dataset
+    # transforms are not tested yet!!
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     train_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt')
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt', transform=transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
     val_dataset = TinyImageNetDataset(
-        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/val.txt')
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/val.txt', transform=transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    test_dataset = TinyImageNetDataset(
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/test.txt', transform=transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
     train_sampler = None
 
@@ -122,6 +143,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
+        batch_size=args.batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True)
+
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -136,6 +162,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # remember best acc@1 and save
         best_acc1 = max(acc1, best_acc1)
+
+    test(test_loader, model, args)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -228,6 +256,25 @@ def validate(val_loader, model, criterion, args):
     return top1.avg
 
 
+prediction = {}
+
+
+def test(test_loader, model, args):
+    model.eval()
+    global prediction
+
+    with torch.no_grad():
+        for i, images in enumerate(test_loader):
+            if args.gpu is not None:
+                images = images.cuda(args.gpu, non_blocking=True)
+
+        output = model(images)
+        prediction[i] = output
+
+    df = pd.DataFrame(prediction)
+    df.to_csv('./prediction.csv')
+
+
 def default_loader(path):
     return Image.open(path).convert('RGB')
 
@@ -261,7 +308,6 @@ class TinyImageNetDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         img_name, label = self.images[index]
         img = self.loader(os.path.join(self.root, img_name))
-        raw_img = img.copy()
         if self.transform is not None:
             img = self.transform(img)
         img = np.array(img, dtype='float32')
