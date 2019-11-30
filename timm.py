@@ -20,6 +20,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
+from PIL import ImageFilter
 # import pretrainedmodels
 import timm
 
@@ -31,7 +32,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
-                    #choices=model_names,
+                    # choices=model_names,
                     help='model architecture: ' +
                     ' | '.join(model_names) +
                     ' (default: resnet18)')
@@ -113,21 +114,22 @@ def main_worker(gpu, ngpus_per_node, args):
     # set dataset
     # set dataset
     train_dataset_transformed = TinyImageNetDataset(
-        './TinyImageNet', './TinyImageNet/train.txt',
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt',
         transform=transforms.Compose([
             transforms.RandomAffine(5, scale=(0.8, 1.5), shear=(-8, 8)),
             transforms.RandomGrayscale(0.05),
+            transforms.RandomHorizontalFlip(0.1),
             transforms.ToTensor(),
             transforms.RandomErasing()
-        ]))
-    
+        ]), loader=default_loader, train_flag=True)
+
     train_dataset_original = TinyImageNetDataset(
-        './TinyImageNet', './TinyImageNet/train.txt',
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/train.txt',
         transform=transforms.ToTensor())
     val_dataset = TinyImageNetDataset(
-        './TinyImageNet', './TinyImageNet/val.txt', transform=transforms.ToTensor())
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/val.txt', transform=transforms.ToTensor())
     test_dataset = TinyImageNetDataset(
-        './TinyImageNet', './TinyImageNet/test.txt', transform=transforms.ToTensor())
+        '../TinyImageNet/TinyImageNet', '../TinyImageNet/TinyImageNet/test.txt', transform=transforms.ToTensor())
 
     train_sampler = None
 
@@ -135,7 +137,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset_transformed, batch_size=args.batch_size, shuffle=(
             train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-        
+
     train_loader_original = torch.utils.data.DataLoader(
         train_dataset_original, batch_size=args.batch_size, shuffle=(
             train_sampler is None),
@@ -155,7 +157,8 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader_transformed, model, criterion, optimizer, epoch, args)
+        train(train_loader_transformed, model,
+              criterion, optimizer, epoch, args)
         train(train_loader_original, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
@@ -265,7 +268,7 @@ prediction = []
 def test(test_loader, model, args, acc, epoch):
     model.eval()
     global prediction
-    
+
     if prediction:
         prediction = []
 
@@ -278,12 +281,13 @@ def test(test_loader, model, args, acc, epoch):
             prediction += output.argmax(dim=1).tolist()
 
     index = []
-    labels = open('./TinyImageNet/test.txt').readlines()
+    labels = open('../TinyImageNet/TinyImageNet/test.txt').readlines()
     for line in labels:
         index.append(line.split('/')[1].strip())
 
     df = pd.DataFrame(prediction, index=index)
-    df.to_csv('./prediction' + '_epoch' + str(epoch) + '_valaccu' + str(acc) + '.csv')
+    df.to_csv('./prediction' + '_epoch' + str(epoch) +
+              '_valaccu' + str(acc) + '.csv')
 
 
 def default_loader(path):
@@ -293,7 +297,7 @@ def default_loader(path):
 class TinyImageNetDataset(torch.utils.data.Dataset):
     """data loader, considering change PIL to cv"""
 
-    def __init__(self, root, data_list, transform=None, loader=default_loader):
+    def __init__(self, root, data_list, transform=None, loader=default_loader, train_flag=False):
         # root: your_path/TinyImageNet/
         # data_list: your_path/TinyImageNet/train.txt etc.
         images = []
@@ -315,13 +319,27 @@ class TinyImageNetDataset(torch.utils.data.Dataset):
         self.images = images
         self.transform = transform
         self.loader = loader
+        self.train_flag = train_flag
+        self.Filters = [ImageFilter.DETAIL,
+                        ImageFilter.EDGE_ENHANCE,
+                        ImageFilter.EDGE_ENHANCE_MORE,
+                        ImageFilter.SMOOTH,
+                        ImageFilter.SMOOTH_MORE,
+                        ImageFilter.SHARPEN,
+                        ImageFilter.GaussianBlur(2),
+                        ImageFilter.BLUR ]
 
     def __getitem__(self, index):
         img_name, label = self.images[index]
         img = self.loader(os.path.join(self.root, img_name))
+
+        if self.train_flag:
+            p = random.randint(0, 7)
+            img = img.filter(self.Filters[p])
+
         if self.transform is not None:
             img = self.transform(img)
-        
+
 #         img = np.array(img, dtype='float32')
 #         img = img.transpose(2, 0, 1)
         return (img, label) if label is not None else img
