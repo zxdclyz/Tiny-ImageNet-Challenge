@@ -1,5 +1,7 @@
 # 深度学习导论 Project-1 Tiny ImageNet Challenge 实验报告
 
+> https://github.com/zxdclyz/Tiny-ImageNet-Challenge
+
 ## 队伍信息
 
 - 队名：TeamName
